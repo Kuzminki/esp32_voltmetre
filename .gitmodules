@@ -1,0 +1,3 @@
+[submodule "lib/lib_Gup"]
+	path = lib/lib_Gup
+	url = https://github.com/Kuzminki/Lib-Gup.git
