@@ -12,7 +12,7 @@
 // paramters define for TFT
 
 // Utilisation des pins du côté DROIT de la carte
-#define TFT_LED 22  // Si tu veux la piloter, sinon branche au 3.3V
+#define TFT_LED 0  // branchée au 3.3V
 #define TFT_CLK 18  // SCK (Hardware SPI)
 #define TFT_SDI 23  // MOSI (Hardware SPI)
 #define TFT_RS  19  // Entre SCK (18) et MOSI (23)
