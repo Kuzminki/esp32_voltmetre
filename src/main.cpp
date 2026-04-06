@@ -11,16 +11,18 @@
 /////////////////////////////////////////////////
 // paramters define for TFT
 
-// Utilisation des pins du côté DROIT de la carte
-#define TFT_LED 0  // branchée au 3.3V
-#define TFT_CLK 18  // SCK (Hardware SPI)
-#define TFT_SDI 23  // MOSI (Hardware SPI)
-#define TFT_RS  19  // Entre SCK (18) et MOSI (23)
-#define TFT_RST 5   // Juste au-dessus de SCK (18)
-#define TFT_CS  16  // Juste en dessous de la Pin 17 (qui est souvent morte)
+// --- CONFIGURATION DES PINS (CÔTÉ DROIT LOLIN32 LITE) ---
+#define TFT_RST 5   // Reset
+#define TFT_RS  19  // Data/Command (RS)
+#define TFT_CS  15  // Chip Select
+#define TFT_SDI 23  // MOSI
+#define TFT_CLK 18  // SCK
+#define TFT_LED 0  // Pin LED (ou 0 si relié direct au 3.3V)
 
+// Création de l'instance de l'écran
+// TFT_22_ILI9225 tft(TFT_RST, TFT_RS, TFT_CS, TFT_SDI, TFT_CLK,150);
 
-TFTGup mylcd = TFTGup(TFT_RST, TFT_RS, TFT_CS, TFT_LED);
+TFTGup mylcd = TFTGup(TFT_RST, TFT_RS, TFT_CS, TFT_SDI, TFT_CLK,200);
 
 //////////////////////////////////////////////////
 // config pour Mesure voltmetre
