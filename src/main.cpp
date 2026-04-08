@@ -12,17 +12,16 @@
 // paramters define for TFT
 
 // --- CONFIGURATION DES PINS (CÔTÉ DROIT LOLIN32 LITE) ---
-#define TFT_RST 5   // Reset
-#define TFT_RS  19  // Data/Command (RS)
-#define TFT_CS  15  // Chip Select
-#define TFT_SDI 23  // MOSI
-#define TFT_CLK 18  // SCK
-#define TFT_LED 0  // Pin LED (ou 0 si relié direct au 3.3V)
+#define TFT_CLK 18 // Pin native (VSPI)
+#define TFT_SDI 23 // Pin native (VSPI)
+#define TFT_RS 19
+#define TFT_RST 17
+#define TFT_CS 5 // Pin CS native (VSPI)
 
 // Création de l'instance de l'écran
 // TFT_22_ILI9225 tft(TFT_RST, TFT_RS, TFT_CS, TFT_SDI, TFT_CLK,150);
 
-TFTGup mylcd = TFTGup(TFT_RST, TFT_RS, TFT_CS, TFT_SDI, TFT_CLK,200);
+TFTGup mylcd = TFTGup(TFT_RST, TFT_RS, TFT_CS, TFT_SDI, TFT_CLK, 200);
 
 //////////////////////////////////////////////////
 // config pour Mesure voltmetre
@@ -48,9 +47,19 @@ Bouton BoutonStartStop(PinBoutonSS);
 Bouton BoutonMoins(PinBoutonMoins);
 
 ////////////////////////////////////////
+// Config de la LED en utilisant jled
+#include <jled.h>
+
+
+// déclare la led
+auto led_record = JLed(26).MaxBrightness(128).Breathe(1000).Forever();
+
+
 void setup()
 {
-    // Serial.begin(115200);
+    Serial.begin(115200);
+    delay(500);
+    Serial.println("--- GUP SYSTEM READY ---");
 
     //--- init LCD ---
 
@@ -64,6 +73,10 @@ void setup()
     MonAxe.InitAxes();
 
     mylcd.drawText(0, LargScreen - 8, "Wait for Press");
+    Serial.println("Mode WAIT");
+
+    //led_record.Stop();
+
 }
 
 void loop()
@@ -74,15 +87,20 @@ void loop()
         if (BoutonStartStop.EtatBouton == 0)
         {
             mylcd.drawText(0, LargScreen - 8, "Wait for Press");
+            Serial.println("Mode WAIT");
+            led_record.Stop();
         }
         else
         {
             mylcd.drawText(0, LargScreen - 8, "Record              ");
+            Serial.println("Mode RECORD");
+            led_record.Reset();
         }
     }
 
     if (BoutonStartStop.EtatBouton == 1)
     {
+        // Enregistrement du point courant
         unsigned long CurrentTime = millis();
         if (CurrentTime - LastTime > DelayMesure)
         {
@@ -92,35 +110,56 @@ void loop()
             MonAxe.AddPlot1(indiceLecture, float(ReadMeasure) / ValMaxAnalogRead * ValMaxVoltmetre);
         }
     }
+    else
+    {
+        // Mode Wait
+        if (BoutonMoins.EventBouton())
+        {
+            if (BoutonMoins.LongPress == 1)
+            {
+                //Reset de l'enregistrement
+                // A COMPLETER
+
+            }
+        }
+    }
+
     if (BoutonStartStop.LongPress == 1)
     {
+        if (BoutonStartStop.EtatBouton == 1)
+        {
+            mylcd.drawText(0, LargScreen - 8, "CURSOR           ");
+        }
         // mylcd.drawText(0, LargScreen - 8, "Cursor Analysis        ");
         bool FlagAnalyseCurseur = 1; // Tant que l'on déplace le curseur sans appuie long sur Start Stop
         int IndicePtCourant = 100;
         int LastIndicePtCourant = IndicePtCourant;
         while (FlagAnalyseCurseur)
         {
-            mylcd.drawText(0, LargScreen - 8, "CURSOR           ");
             BoutonMoins.Surveille();
             BoutonStartStop.Surveille();
 
             if (BoutonStartStop.EventBouton())
             {
+
                 // Demande de sortie ou IndicePtCourant +1
                 if (BoutonStartStop.LongPress)
                 { // demande de sortie
                     BoutonStartStop.EtatBouton = 0;
-                    BoutonStartStop.LongPress=0;
+                    BoutonStartStop.LongPress = 0;
                     FlagAnalyseCurseur = 0; // Fin d'analyse
-                    
+
                     // Efface l'ancien curseur
                     MonAxe.drawCursor(LastIndicePtCourant, COLOR_BLACK);
                     MonAxe.drawLine1(COLOR_LIGHTBLUE);
                     mylcd.drawText(0, LargScreen - 8, "Wait for Press       ");
+                    Serial.println("Mode Back WAIT");
                 }
                 else
                 {
-                     IndicePtCourant = min(IndicePtCourant + 1, 100);
+                    IndicePtCourant = min(IndicePtCourant + 1, 100);
+                    Serial.printf("Indice: %i", IndicePtCourant);
+                    Serial.println();
                     // Efface l'ancien curseur
                     MonAxe.drawCursor(LastIndicePtCourant, COLOR_BLACK);
                     MonAxe.drawLine1(COLOR_LIGHTBLUE);
@@ -131,17 +170,20 @@ void loop()
             }
             if (BoutonMoins.EventBouton())
             {
-   
                 // Demande de sortie ou IndicePtCourant +1
 
                 IndicePtCourant = max(IndicePtCourant - 1, 0);
+                Serial.printf("Indice: %i", IndicePtCourant);
+                Serial.println();
                 // Efface l'ancien curseur
                 MonAxe.drawCursor(LastIndicePtCourant, COLOR_BLACK);
                 MonAxe.drawLine1(COLOR_LIGHTBLUE);
 
                 MonAxe.drawCursor(IndicePtCourant, COLOR_RED);
                 LastIndicePtCourant = IndicePtCourant;
-            }            
+            }
+            led_record.Update();
         }
     }
+    led_record.Update();
 }
