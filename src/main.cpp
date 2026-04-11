@@ -52,7 +52,7 @@ Bouton BoutonMoins(PinBoutonMoins);
 
 
 // déclare la led
-auto led_record = JLed(26).MaxBrightness(128).Breathe(1000).Forever();
+auto led_record = JLed(26).MaxBrightness(58).On().Forever();
 
 
 void setup()
@@ -75,13 +75,14 @@ void setup()
     mylcd.drawText(0, LargScreen - 8, "Wait for Press");
     Serial.println("Mode WAIT");
 
-    //led_record.Stop();
+    led_record.Stop();
 
 }
 
 void loop()
 {
     BoutonStartStop.Surveille();
+    BoutonMoins.Surveille();
     if (BoutonStartStop.EventBouton())
     {
         if (BoutonStartStop.EtatBouton == 0)
@@ -100,7 +101,7 @@ void loop()
 
     if (BoutonStartStop.EtatBouton == 1)
     {
-        // Enregistrement du point courant
+        // Mode Record - Enregistrement du point courant
         unsigned long CurrentTime = millis();
         if (CurrentTime - LastTime > DelayMesure)
         {
@@ -115,10 +116,17 @@ void loop()
         // Mode Wait
         if (BoutonMoins.EventBouton())
         {
+            Serial.println("Push Moins");
             if (BoutonMoins.LongPress == 1)
             {
                 //Reset de l'enregistrement
-                // A COMPLETER
+                Serial.println("Reset");
+                MonAxe.NbVal1=0;
+                indiceLecture=0;
+                mylcd.drawText(0, LargScreen - 8, "Reset Line1      ",COLOR_GREENYELLOW);
+                delay(500);
+                MonAxe.ClearAll();
+                mylcd.drawText(0, LargScreen - 8, "Wait for Press");
 
             }
         }
@@ -132,7 +140,7 @@ void loop()
         }
         // mylcd.drawText(0, LargScreen - 8, "Cursor Analysis        ");
         bool FlagAnalyseCurseur = 1; // Tant que l'on déplace le curseur sans appuie long sur Start Stop
-        int IndicePtCourant = 100;
+        int IndicePtCourant = MonAxe.NbVal1;
         int LastIndicePtCourant = IndicePtCourant;
         while (FlagAnalyseCurseur)
         {
@@ -157,9 +165,8 @@ void loop()
                 }
                 else
                 {
-                    IndicePtCourant = min(IndicePtCourant + 1, 100);
-                    Serial.printf("Indice: %i", IndicePtCourant);
-                    Serial.println();
+                    IndicePtCourant = min(IndicePtCourant + 1, MonAxe.NbVal1);
+                    Serial.printf("Indice: %i\n", IndicePtCourant);
                     // Efface l'ancien curseur
                     MonAxe.drawCursor(LastIndicePtCourant, COLOR_BLACK);
                     MonAxe.drawLine1(COLOR_LIGHTBLUE);
