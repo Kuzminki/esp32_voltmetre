@@ -57,7 +57,7 @@ auto led_record = JLed(26).MaxBrightness(58).On().Forever();
 
 // a developper ----------
 #include <Guptime.h>
-Guptimer Timer(500);
+Guptimer Timer;
 //------------
 
 void setup()
@@ -83,6 +83,7 @@ void setup()
     led_record.Stop();
 
     Timer.Init();
+    
 }
 
 void loop()
