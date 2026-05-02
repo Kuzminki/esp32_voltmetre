@@ -28,8 +28,6 @@ TFTGup mylcd = TFTGup(TFT_RST, TFT_RS, TFT_CS, TFT_SDI, TFT_CLK, 200);
 
 #define PinCapteur 32
 
-int DelayMesure = 100; // ms
-unsigned long LastTime = millis();
 int ValMaxAnalogRead = 4095;
 float ValMaxVoltmetre = 3.3;
 AxesGup MonAxe(mylcd, 0, 0, HautScreen, LargScreen - 16);
@@ -54,6 +52,13 @@ Bouton BoutonMoins(PinBoutonMoins);
 // déclare la led
 auto led_record = JLed(26).MaxBrightness(58).On().Forever();
 
+// declare le timer entre deux mesures
+#include <Guptime.h>
+Guptimer timer_measure;
+Guptimer timer_display;
+
+//TODO : Pour test
+long Test_value=0.0;
 
 void setup()
 {
@@ -69,7 +74,8 @@ void setup()
     mylcd.println("LCD OK");
 
     MonAxe.DefineY1MinMax(0, ValMaxVoltmetre);
-    MonAxe.FlagautoScaleY = 0;
+    MonAxe.FlagautoScaleY = 1;
+    MonAxe.FlagLinetype1 = 1;
     MonAxe.InitAxes();
 
     mylcd.drawText(0, LargScreen - 8, "Wait for Press");
@@ -77,6 +83,11 @@ void setup()
 
     led_record.Stop();
 
+    // parametres de frequences
+    // entre deux mesures
+    timer_measure.Init(100);
+    // entre deux affichages
+    timer_display.Init(1000);
 }
 
 void loop()
@@ -102,14 +113,28 @@ void loop()
     if (BoutonStartStop.EtatBouton == 1)
     {
         // Mode Record - Enregistrement du point courant
-        unsigned long CurrentTime = millis();
-        if (CurrentTime - LastTime > DelayMesure)
-        {
+        if (timer_measure.Check())
+        {        
             indiceLecture++;
-            LastTime = CurrentTime;
             int ReadMeasure = analogRead(PinCapteur);
-            MonAxe.AddPlot1(indiceLecture, float(ReadMeasure) / ValMaxAnalogRead * ValMaxVoltmetre);
+            float current_time=millis()/1000.0f;
+            float current_measure=float(ReadMeasure) / ValMaxAnalogRead * ValMaxVoltmetre;
+            MonAxe.AddPlot1(current_time, current_measure);
+            // TEST
+            //MonAxe.AddPlot1(current_time, float(Test_value));
+            // Test_value=(Test_value+1)%120;
+
+            float diff_acq_time=(current_time-MonAxe.Line1[MonAxe.NbVal1-1][0]/100);
+
+            Serial.printf("time %.2f | delta time %.2f | Value %.2f\n",current_time,diff_acq_time,float(ReadMeasure));
+
         }
+        if (timer_display.Check())
+        {
+            /* MAJ de l'affichage */
+            MonAxe.RefreshAllLines();
+        }
+        
     }
     else
     {
