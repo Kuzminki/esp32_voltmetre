@@ -26,7 +26,7 @@ TFTGup mylcd = TFTGup(TFT_RST, TFT_RS, TFT_CS, TFT_SDI, TFT_CLK, 200);
 //////////////////////////////////////////////////
 // config pour Mesure voltmetre
 
-#define PinCapteur 32
+#define PinCapteur 35
 
 int ValMaxAnalogRead = 4095;
 float ValMaxVoltmetre = 3.3;
@@ -57,8 +57,9 @@ auto led_record = JLed(26).MaxBrightness(58).On().Forever();
 Guptimer timer_measure;
 Guptimer timer_display;
 
-//TODO : Pour test
-long Test_value=0.0;
+// Flag pour effacer le dernier enreg quand un nouveau record commence
+bool Flag_efface_record_qd_enreg;
+
 
 void setup()
 {
@@ -74,7 +75,7 @@ void setup()
     mylcd.println("LCD OK");
 
     MonAxe.DefineY1MinMax(0, ValMaxVoltmetre);
-    MonAxe.FlagautoScaleY = 1;
+    MonAxe.FlagautoScaleY = 0;
     MonAxe.FlagLinetype1 = 1;
     MonAxe.InitAxes();
 
@@ -98,14 +99,29 @@ void loop()
     {
         if (BoutonStartStop.EtatBouton == 0)
         {
+            // detection dún arret d'enregistrement
             mylcd.drawText(0, LargScreen - 8, "Wait for Press");
             Serial.println("Mode WAIT");
+            MonAxe.RefreshAllLines();
+            
             led_record.Stop();
+            Flag_efface_record_qd_enreg=true;
         }
         else
         {
+            // Detection d'un lancement d'enregistrement
             mylcd.drawText(0, LargScreen - 8, "Record              ");
             Serial.println("Mode RECORD");
+        
+            if (Flag_efface_record_qd_enreg&&BoutonStartStop.LongPress==0)
+            {
+                // clear du precedent enregistrement
+                MonAxe.NbVal1 = 0;
+                indiceLecture = 0;
+                MonAxe.ClearAll();
+                Flag_efface_record_qd_enreg=false;
+            }
+
             led_record.Reset();
         }
     }
@@ -113,47 +129,49 @@ void loop()
     if (BoutonStartStop.EtatBouton == 1)
     {
         // Mode Record - Enregistrement du point courant
-        if (timer_measure.Check())
+        if (timer_measure.Check()&&BoutonStartStop.PositionBouton==false&&BoutonStartStop.LongPress==0)
         {        
+            //on doit eviter de mesurer quand
+            // le long press se prepare avec l'appui sur le bouton
+            // le long press est declenché
+            timer_measure.Reset();
             indiceLecture++;
             int ReadMeasure = analogRead(PinCapteur);
             float current_time=millis()/1000.0f;
             float current_measure=float(ReadMeasure) / ValMaxAnalogRead * ValMaxVoltmetre;
             MonAxe.AddPlot1(current_time, current_measure);
-            // TEST
-            //MonAxe.AddPlot1(current_time, float(Test_value));
-            // Test_value=(Test_value+1)%120;
 
-            float diff_acq_time=(current_time-MonAxe.Line1[MonAxe.NbVal1-1][0]/100);
+            float diff_acq_time=(current_time-float(MonAxe.Line1[MonAxe.NbVal1-2][0])/100);
 
-            Serial.printf("time %.2f | delta time %.2f | Value %.2f\n",current_time,diff_acq_time,float(ReadMeasure));
+            Serial.printf("time %.2f | last time %.2f | delta time %.2f | Value %.2f\n",
+                current_time,
+                float(MonAxe.Line1[MonAxe.NbVal1-2][0])/100.0,
+                diff_acq_time,
+                float(ReadMeasure));
 
         }
         if (timer_display.Check())
         {
+            timer_display.Reset();
             /* MAJ de l'affichage */
             MonAxe.RefreshAllLines();
+            Serial.println("Refresh Display");
         }
         
     }
     else
     {
-        // Mode Wait
-        if (BoutonMoins.EventBouton())
+        // en Mode Wait
+        if (BoutonMoins.EventBouton() && BoutonMoins.LongPress == 1)
         {
-            Serial.println("Push Moins");
-            if (BoutonMoins.LongPress == 1)
-            {
-                //Reset de l'enregistrement
-                Serial.println("Reset");
-                MonAxe.NbVal1=0;
-                indiceLecture=0;
-                mylcd.drawText(0, LargScreen - 8, "Reset Line1      ",COLOR_GREENYELLOW);
-                delay(500);
-                MonAxe.ClearAll();
-                mylcd.drawText(0, LargScreen - 8, "Wait for Press");
-
-            }
+            // Reset de l'enregistrement
+            Serial.println("Reset");
+            MonAxe.NbVal1 = 0;
+            indiceLecture = 0;
+            mylcd.drawText(0, LargScreen - 8, "Reset Line1      ", COLOR_GREENYELLOW);
+            delay(500);
+            MonAxe.ClearAll();
+            mylcd.drawText(0, LargScreen - 8, "Wait for Press");
         }
     }
 
@@ -162,13 +180,19 @@ void loop()
         if (BoutonStartStop.EtatBouton == 1)
         {
             mylcd.drawText(0, LargScreen - 8, "CURSOR           ");
+            MonAxe.RefreshAllLines();
         }
         // mylcd.drawText(0, LargScreen - 8, "Cursor Analysis        ");
         bool FlagAnalyseCurseur = 1; // Tant que l'on déplace le curseur sans appuie long sur Start Stop
         int IndicePtCourant = MonAxe.NbVal1;
         int LastIndicePtCourant = IndicePtCourant;
+
+        // passage en mode rafale quand la fonction Cursor est active
+        BoutonMoins.FlagLongPressRafale=true;
+        
         while (FlagAnalyseCurseur)
         {
+            // en mode Curseur bouclé
             BoutonMoins.Surveille();
             BoutonStartStop.Surveille();
 
@@ -182,6 +206,11 @@ void loop()
                     BoutonStartStop.LongPress = 0;
                     FlagAnalyseCurseur = 0; // Fin d'analyse
 
+                    // annulation du mode rafale
+                    BoutonMoins.FlagLongPressRafale = false;
+                    // BoutonStartStop.FlagLongPressRafale = false; incompatible avec le stop de la fonction
+
+
                     // Efface l'ancien curseur
                     MonAxe.drawCursor(LastIndicePtCourant, COLOR_BLACK);
                     MonAxe.drawLine1(COLOR_LIGHTBLUE);
@@ -190,28 +219,27 @@ void loop()
                 }
                 else
                 {
+                    // Deplacement curseur +1
                     IndicePtCourant = min(IndicePtCourant + 1, MonAxe.NbVal1);
                     Serial.printf("Indice: %i\n", IndicePtCourant);
                     // Efface l'ancien curseur
                     MonAxe.drawCursor(LastIndicePtCourant, COLOR_BLACK);
                     MonAxe.drawLine1(COLOR_LIGHTBLUE);
 
-                    MonAxe.drawCursor(IndicePtCourant, COLOR_RED);
+                    MonAxe.drawCursor(IndicePtCourant, COLOR_LIGHTGREEN);
                     LastIndicePtCourant = IndicePtCourant;
                 }
             }
             if (BoutonMoins.EventBouton())
             {
-                // Demande de sortie ou IndicePtCourant +1
+                // Deplacement curseur IndicePtCourant -1
 
                 IndicePtCourant = max(IndicePtCourant - 1, 0);
-                Serial.printf("Indice: %i", IndicePtCourant);
-                Serial.println();
                 // Efface l'ancien curseur
                 MonAxe.drawCursor(LastIndicePtCourant, COLOR_BLACK);
                 MonAxe.drawLine1(COLOR_LIGHTBLUE);
 
-                MonAxe.drawCursor(IndicePtCourant, COLOR_RED);
+                MonAxe.drawCursor(IndicePtCourant, COLOR_LIGHTGREEN);
                 LastIndicePtCourant = IndicePtCourant;
             }
             led_record.Update();
