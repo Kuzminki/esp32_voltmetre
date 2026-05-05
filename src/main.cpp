@@ -29,7 +29,7 @@ TFTGup mylcd = TFTGup(TFT_RST, TFT_RS, TFT_CS, TFT_SDI, TFT_CLK, 200);
 #define PinCapteur 35
 
 int ValMaxAnalogRead = 4095;
-float ValMaxVoltmetre = 3.3;
+float ValMaxVoltmetre = 32;
 AxesGup MonAxe(mylcd, 0, 0, HautScreen, LargScreen - 16);
 int indiceLecture = 0;
 
@@ -60,6 +60,18 @@ Guptimer timer_display;
 // Flag pour effacer le dernier enreg quand un nouveau record commence
 bool Flag_efface_record_qd_enreg;
 
+// configuration du capteur INA219
+#include <Wire.h>
+#include <Adafruit_INA219.h>
+
+// Création de l'instance
+Adafruit_INA219 Sensor_ina219;
+// init des variables de lecture
+// float shuntvoltage = 0;
+float busvoltage = 0;
+float current_mA = 0;
+// float loadvoltage = 0;
+float power_mW = 0;
 
 void setup()
 {
@@ -79,9 +91,6 @@ void setup()
     MonAxe.FlagLinetype1 = 1;
     MonAxe.InitAxes();
 
-    mylcd.drawText(0, LargScreen - 8, "Wait for Press");
-    Serial.println("Mode WAIT");
-
     led_record.Stop();
 
     // parametres de frequences
@@ -89,6 +98,41 @@ void setup()
     timer_measure.Init(100);
     // entre deux affichages
     timer_display.Init(1000);
+
+    //Configuration INA219
+    while (!Serial)
+    {
+        delay(10);
+    } // Attente de l'ouverture du moniteur série
+
+    mylcd.println("Initialisation du INA219...");
+
+    // Initialisation du capteur (adresse par défaut 0x40)
+    if (!Sensor_ina219.begin())
+    {
+        mylcd.println("Erreur: INA219 introuvable");
+        while (1)
+        {
+            delay(10);
+        }
+    }
+    // Reset complet du capteur
+    Wire.beginTransmission(0x40);
+    Wire.write(0x00); // Registre de configuration
+    Wire.write(0x80); // Bit de Reset
+    Wire.write(0x00);
+    Wire.endTransmission();
+
+    delay(100);
+    Sensor_ina219.setCalibration_32V_2A(); // Re-calibrer proprement
+
+    // OPTIONNEL : Calibration
+    // Par défaut, la bibliothèque configure le capteur pour 32V et 2A.
+    // Pour plus de précision sur de petits courants (ex: < 400mA), on peut utiliser :
+    // ina219.setCalibration_16V_400mA();
+
+    mylcd.drawText(0, LargScreen - 8, "Wait for Press");
+    Serial.println("Mode WAIT");
 }
 
 void loop()
@@ -121,7 +165,7 @@ void loop()
                 MonAxe.ClearAll();
                 Flag_efface_record_qd_enreg=false;
             }
-
+            mylcd.setBackgroundColor(COLOR_BLACK);
             led_record.Reset();
         }
     }
@@ -136,10 +180,20 @@ void loop()
             // le long press est declenché
             timer_measure.Reset();
             indiceLecture++;
-            int ReadMeasure = analogRead(PinCapteur);
+            
             float current_time=millis()/1000.0f;
-            float current_measure=float(ReadMeasure) / ValMaxAnalogRead * ValMaxVoltmetre;
-            MonAxe.AddPlot1(current_time, current_measure);
+            // int ReadMeasure = analogRead(PinCapteur);
+            // float current_measure=float(ReadMeasure) / ValMaxAnalogRead * ValMaxVoltmetre;
+
+              // Lecture des registres
+            //shuntvoltage = ina219.getShuntVoltage_mV();
+            busvoltage = Sensor_ina219.getBusVoltage_V();
+            
+            //current_mA = ina219.getCurrent_mA();
+            // power_mW = ina219.getPower_mW();
+            // loadvoltage = busvoltage + (shuntvoltage / 1000);
+
+            MonAxe.AddPlot1(current_time, busvoltage);
 
             float diff_acq_time=(current_time-float(MonAxe.Line1[MonAxe.NbVal1-2][0])/100);
 
@@ -147,8 +201,7 @@ void loop()
                 current_time,
                 float(MonAxe.Line1[MonAxe.NbVal1-2][0])/100.0,
                 diff_acq_time,
-                float(ReadMeasure));
-
+                float(busvoltage));
         }
         if (timer_display.Check())
         {
@@ -162,6 +215,16 @@ void loop()
     else
     {
         // en Mode Wait
+
+        // Affichage de la valeur courante du capteur
+        busvoltage = Sensor_ina219.getBusVoltage_V();
+        current_mA = Sensor_ina219.getCurrent_mA();
+
+        mylcd.setBackgroundColor(COLOR_WHITE);
+        mylcd.drawText(0 + HautScreen / 4, 0 + LargScreen - 24, 
+            String(busvoltage) + " V "+String(current_mA) + " mA ", COLOR_BLUEVIOLET);
+        mylcd.setBackgroundColor(COLOR_BLACK);
+
         if (BoutonMoins.EventBouton() && BoutonMoins.LongPress == 1)
         {
             // Reset de l'enregistrement
@@ -173,6 +236,7 @@ void loop()
             MonAxe.ClearAll();
             mylcd.drawText(0, LargScreen - 8, "Wait for Press");
         }
+
     }
 
     if (BoutonStartStop.LongPress == 1)
