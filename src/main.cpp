@@ -1,5 +1,6 @@
 #include <Arduino.h>
 
+
 ////////////////////////////////////////
 //      TFT (librairie Nkawu/TFT_22_ILI9225)
 ////////////////////////////////////////
@@ -131,7 +132,7 @@ void setup()
     // Pour plus de précision sur de petits courants (ex: < 400mA), on peut utiliser :
     // ina219.setCalibration_16V_400mA();
 
-    mylcd.drawText(0, LargScreen - 8, "Wait for Press");
+    mylcd.drawText(0, LargScreen - 8, "Mode WAIT         ");
     Serial.println("Mode WAIT");
 }
 
@@ -150,12 +151,17 @@ void loop()
             
             led_record.Stop();
             Flag_efface_record_qd_enreg=true;
+            timer_measure.Init(200); // pour les affichage en mode wait
         }
         else
         {
             // Detection d'un lancement d'enregistrement
+            //efface le bandeau d'affichage en continue
+            mylcd.fillRectangle(0,LargScreen-16,HautScreen,LargScreen,COLOR_BLACK);
+
             mylcd.drawText(0, LargScreen - 8, "Record              ");
             Serial.println("Mode RECORD");
+            timer_measure.Init(100); // pour les records
         
             if (Flag_efface_record_qd_enreg&&BoutonStartStop.LongPress==0)
             {
@@ -215,15 +221,22 @@ void loop()
     else
     {
         // en Mode Wait
+        // affichage de la mesure courante
 
-        // Affichage de la valeur courante du capteur
-        busvoltage = Sensor_ina219.getBusVoltage_V();
-        current_mA = Sensor_ina219.getCurrent_mA();
+        if (timer_measure.Check())
+        {
+            timer_measure.Reset();
+            // Affichage de la valeur courante du capteur
+            busvoltage = Sensor_ina219.getBusVoltage_V();
+            current_mA = Sensor_ina219.getCurrent_mA();
 
-        mylcd.setBackgroundColor(COLOR_WHITE);
-        mylcd.drawText(0 + HautScreen / 4, 0 + LargScreen - 24, 
-            String(busvoltage) + " V "+String(current_mA) + " mA ", COLOR_BLUEVIOLET);
-        mylcd.setBackgroundColor(COLOR_BLACK);
+            mylcd.setBackgroundColor(COLOR_WHITE);
+            mylcd.setFont(Terminal11x16); // height 16
+            mylcd.drawText(0, LargScreen-16,
+                           String(busvoltage) + " V " + String(current_mA) + " mA ", COLOR_NAVY);
+            mylcd.setBackgroundColor(COLOR_BLACK);
+            mylcd.setFont(Terminal6x8); // height 8
+        }
 
         if (BoutonMoins.EventBouton() && BoutonMoins.LongPress == 1)
         {
