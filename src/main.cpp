@@ -55,15 +55,10 @@ Bouton BoutonMoins(PinBoutonMoins);
 // déclare la led
 auto led_record = JLed(26).MaxBrightness(58).On().Forever();
 
-// a developper ----------
-#include <Guptime.h>
-Guptimer Timer;
-//------------
-
 void setup()
 {
     Serial.begin(115200);
-    delay(500);
+    delay(200);
     Serial.println("--- GUP SYSTEM READY ---");
 
     //--- init LCD ---
@@ -81,17 +76,10 @@ void setup()
     Serial.println("Mode WAIT");
 
     led_record.Stop();
-
-    Timer.Init();
     
 }
 
 void loop()
 {
-    if (Timer.Check())
-    {
-
-        mylcd.println(String(millis())+" ms");
-    }
     
 }
