@@ -55,28 +55,30 @@ Bouton BoutonMoins(PinBoutonMoins);
 // déclare la led
 auto led_record = JLed(26).MaxBrightness(58).On().Forever();
 
+// Définition du bus matériel HSPI
+SPIClass hspi(HSPI);
+
+// Broche de contrôle pour le Parallel Load (Broche 1 du 74HC165)
+const int pinPL = 13;
+
 void setup()
 {
+    // Initialisation de la communication série à 115200 bauds
     Serial.begin(115200);
-    delay(200);
-    Serial.println("--- GUP SYSTEM READY ---");
+    while (!Serial)
+    {
+    } // Attend l'ouverture du moniteur série
 
-    //--- init LCD ---
+    // Configuration de la broche PL en sortie
+    pinMode(pinPL, OUTPUT);
+    digitalWrite(pinPL, HIGH);
 
-    mylcd.begin();
-    mylcd.setOrientation(3);
-    mylcd.setFont(Terminal6x8); // height 8
-    mylcd.println("LCD OK");
+    // Initialisation du bus HSPI : SCK=14, MISO=12, MOSI=13 (obligatoire pour init mais ignoré), SS=15 (ignoré)
+    hspi.begin(14, 12, 13, 15);
 
-    MonAxe.DefineY1MinMax(0, ValMaxVoltmetre);
-    MonAxe.FlagautoScaleY = 0;
-    MonAxe.InitAxes();
-
-    mylcd.drawText(0, LargScreen - 8, "Wait for Press");
-    Serial.println("Mode WAIT");
+    Serial.println("--- Début du test du 74HC165 ---");
 
     led_record.Stop();
-    
 }
 
 void loop()
