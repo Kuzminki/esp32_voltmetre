@@ -53,13 +53,16 @@ Bouton BoutonMoins(PinBoutonMoins);
 
 
 // déclare la led
-auto led_record = JLed(26).MaxBrightness(58).On().Forever();
+auto led_record = JLed(32).MaxBrightness(58).On().Forever();
 
-// Définition du bus matériel HSPI
-SPIClass hspi(HSPI);
+// test de 
+#include <ShiftIn.h>
 
-// Broche de contrôle pour le Parallel Load (Broche 1 du 74HC165)
-const int pinPL = 13;
+// Déclarer le décalage : 1 seul boîtier 74HC165 (8 bits)
+// Paramètres : ShiftIn<nombre_de_puces>(Broche_PL, Broche_CP, Broche_Q7)
+// En utilisant vos broches HSPI : PL=13, CP/Clock=14, Q7/MISO=12
+
+ShiftIn<1> shiftRegister;
 
 void setup()
 {
@@ -69,19 +72,30 @@ void setup()
     {
     } // Attend l'ouverture du moniteur série
 
-    // Configuration de la broche PL en sortie
-    pinMode(pinPL, OUTPUT);
-    digitalWrite(pinPL, HIGH);
+    // Ordre des arguments : begin(pLoadPin, clockENPin, dataPin, clockPin)
+    shiftRegister.begin(5, 17, 19, 18);
 
-    // Initialisation du bus HSPI : SCK=14, MISO=12, MOSI=13 (obligatoire pour init mais ignoré), SS=15 (ignoré)
-    hspi.begin(14, 12, 13, 15);
+    Serial.println("--- Test 74HC165 avec Librairie ShiftIn ---");
 
-    Serial.println("--- Début du test du 74HC165 ---");
 
     led_record.Stop();
 }
 
 void loop()
 {
-    
+    led_record.On();
+    // 1. Lire physiquement le registre à décalage
+    shiftRegister.read();
+
+    // 3. Affichage dans le moniteur série de D7 à D0
+    Serial.print("État des boutons (D7->D0) : ");
+    for (int i = 0; i <= 7; i++)
+    {
+        Serial.print(1-shiftRegister.state(i));
+    }
+    Serial.println();
+
+    // 4. Attente de 1000ms (1 seconde)
+    delay(1000);
+    led_record.Off();
 }
